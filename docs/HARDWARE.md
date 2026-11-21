@@ -53,7 +53,7 @@ test or prove the entire sensor is healthy.
 
 The installed Linux header described FP_INFO versions 0/1, while this firmware
 advertises only versions 2/3. The current ChromeOS header documents these newer
-layouts. Capability negotiation is a requirement; the driver patches handle this.
+layouts. Capability negotiation is a requirement; the driver handles this.
 
 ## Behaviour worth knowing
 

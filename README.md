@@ -3,11 +3,11 @@
 Fingerprint login for the ChromeOS fingerprint reader (FPMCU) on an HP Elite
 Dragonfly Chromebook ("Redrix") running Omarchy or another Arch-based Linux.
 
-It works by packaging a patched `crfpmoc` driver for libfprint, using stock
+It works by packaging the `crfpmoc` driver for libfprint (from a libfprint branch), using stock
 `fprintd`, and adding PAM lines so a fingerprint can approve `sudo`, polkit
 prompts and (on Omarchy) the lock screen. Password fallback is kept everywhere.
-This repo holds the driver patches, the packaging recipe, the install scripts
-and the driver tests.
+This repo holds the packaging recipe, the install scripts and the driver tests;
+the driver source itself lives on a libfprint branch (see Upstream).
 
 ## Supported hardware
 
@@ -41,7 +41,9 @@ it failed. Options: `--package FILE` to use a prebuilt package, `--undo`,
 ## What it changes, and how to undo
 
 - Installs `libfprint-crfpmoc-local` (replacing stock `libfprint`) and `fprintd`.
-- Stores your enrolled print(s) under `/var/lib/fprint`.
+- Stores your enrolled print(s) under `/var/lib/fprint`, and a random
+  per-machine key at `/var/lib/fprint/.crfpmoc/key` (root-only), created on first
+  enroll or verify.
 - Edits `/etc/pam.d/sudo` (backup at `/etc/pam.d/sudo.before-fingerprint`) and
   creates `/etc/pam.d/polkit-1`.
 - On Omarchy, runs `omarchy-apply-lock`, which writes
@@ -56,9 +58,9 @@ if you answer yes, your enrolled prints.
 
 ## Known limitations and security
 
-- The driver uses a **fixed, publicly known seed/context**. Templates are still
-  encrypted by the reader, but anyone who knows the constant can derive the same
-  key setup; a machine-unique seed is future work.
+- Templates are encrypted by the reader with a random per-machine key (seed and
+  user context) the driver generates once from the kernel RNG. The key is
+  readable by root (no TPM sealing) and is one key per machine, not per user.
 - The driver has had **no security review**. A fingerprint can approve `sudo`,
   so treat this as convenience, not strong authentication.
 - SDDM/login stays password-only.
@@ -73,20 +75,42 @@ if you answer yes, your enrolled prints.
 - Do not run the experimental seed tools in `experimental/standalone/`
   (`--restore`, `--prepare`): they program a different seed, and prints enrolled
   while it is set stop working after a reboot.
+- Do not delete, edit or loosen the permissions of `/var/lib/fprint/.crfpmoc/key`:
+  the driver treats an invalid key file as an error and never replaces it.
 
 ## Upstream
 
-The `crfpmoc` driver is an open upstream merge request (libfprint !512); the
-fixes in `patches/` are not yet upstream.
+The `crfpmoc` driver is an open upstream merge request (libfprint !512),
+maintained by a libfprint maintainer and not merged. The driver source for this
+repo is the `crfpmoc` branch of `https://github.com/lugnut42/libfprint`:
+upstream master, the !512 history (authorship preserved), three commits from the
+acd407 downstream fork, and our fixes as separate commits. The fixes meant for
+the maintainer are on the `crfpmoc-upstream-fixes` branch and have not been
+submitted yet. Omarchy detection of this reader can only follow once upstream
+libfprint includes the driver.
+
+## Updating / rebuilding
+
+`packaging/PKGBUILD` pins one commit of the `crfpmoc` branch. To move to a newer
+commit, change `_commit` and `pkgver`, run `makepkg` in `packaging/`, then
+`scripts/update.sh` to install it and re-check your enrolled finger. To build
+from a local clone: `LIBFPRINT_REPO=file:///path/to/libfprint makepkg -f`. If you
+are coming from an older fixed-seed build, use `scripts/migrate-to-machine-key.sh`
+once (it deletes prints; reboot, then re-enroll).
+
+## Backup
+
+Enrolled prints and the key file belong together. Back up and restore all of
+`/var/lib/fprint`, including the hidden `.crfpmoc` directory, or re-enroll. Losing
+the key only costs a re-enroll.
 
 ## Layout
 
 | Path | Contents |
 | --- | --- |
-| `scripts/` | `install.sh` (entry point), plus the steps it runs: `install-and-enroll.sh`, `enable-fingerprint-auth.sh`; `smoke-test.sh` for the build tree |
-| `patches/` | libfprint patches for the driver |
-| `packaging/` | PKGBUILD for `libfprint-crfpmoc-local` |
-| `tests/` | offline driver tests, see [docs/TESTING.md](docs/TESTING.md) |
+| `scripts/` | `install.sh` (entry point), plus the steps it runs: `install-and-enroll.sh`, `enable-fingerprint-auth.sh`; `update.sh`, `migrate-to-machine-key.sh`, `smoke-test.sh` (build tree of a libfprint clone), `lib.sh` (shared helpers) |
+| `packaging/` | PKGBUILD for `libfprint-crfpmoc-local`; pins a commit of the libfprint `crfpmoc` branch |
+| `tests/` | offline driver tests (run against a libfprint clone), see [docs/TESTING.md](docs/TESTING.md) |
 | `docs/` | [STATUS.md](docs/STATUS.md), [HARDWARE.md](docs/HARDWARE.md), [TESTING.md](docs/TESTING.md) |
 | `experimental/standalone/` | earlier standalone C groundwork, unused; holds the read-only diagnostic |
 | `AGENTS.md` | rules for contributors and coding agents |

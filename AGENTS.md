@@ -3,7 +3,7 @@
 ## Scope
 
 This repo makes the ChromeOS fingerprint reader on a Redrix Chromebook usable on
-Omarchy/Arch through the patched `crfpmoc` libfprint driver, stock fprintd and
+Omarchy/Arch through the `crfpmoc` libfprint driver (source: the `crfpmoc` branch of the libfprint fork), stock fprintd and
 PAM. Read README.md and docs/STATUS.md first. The standalone C code under
 `experimental/standalone/` is unused history; do not extend it.
 
@@ -16,6 +16,9 @@ PAM. Read README.md and docs/STATUS.md first. The standalone C code under
 - Tests must run unprivileged and offline without a reader.
 - Use synthetic templates and secrets only. Never use a person's fingerprint
   image or template as a fixture.
+- Driver changes are made as commits on the libfprint `crfpmoc` branch (tests
+  first, in this repo), then the package pin in `packaging/PKGBUILD` is bumped.
+  There is no `patches/` directory.
 - Report red/green evidence and anything still unverified on hardware.
 
 ## Hardware, PAM and system boundaries
@@ -25,6 +28,8 @@ PAM. Read README.md and docs/STATUS.md first. The standalone C code under
 - Do not alter PAM, lock-screen authentication, boot configuration, firmware or
   the installed libfprint as a side effect of building or running tests.
 - Preserve password fallback in every authentication change.
+- The machine key file (`/var/lib/fprint/.crfpmoc/key`) and enrolled prints are
+  private data: never copy them into the repo, issues or logs.
 - Never commit or print seeds, fingerprint images, templates, account-specific
   contexts, or raw device dumps.
 - Do not edit /usr/share/omarchy. Do not run Omarchy's fingerprint setup menu

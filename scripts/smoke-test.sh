@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Live smoke test of the patched crfpmoc driver from the build tree.
+# Live smoke test of the crfpmoc driver from a libfprint clone's build tree
+# (default ../libfprint/_build/examples; override with FP_EXAMPLES_DIR).
 # Enrolls one finger, then verifies with the same finger and a different one.
 # Nothing is installed; logs and the encrypted print go to ~/fp-smoke.
 set -u
 
 # shellcheck source=lib.sh
 source "$(dirname "$(readlink -f "$0")")/lib.sh"
-EX=${FP_EXAMPLES_DIR:-$REPO_ROOT/build-libfprint-reference/examples}
+EX=${FP_EXAMPLES_DIR:-$REPO_ROOT/../libfprint/_build/examples}
 OUT="$HOME/fp-smoke"
 
 if [[ $EUID -eq 0 ]]; then
@@ -14,7 +15,7 @@ if [[ $EUID -eq 0 ]]; then
   exit 2
 fi
 for bin in enroll verify; do
-  [[ -x $EX/$bin ]] || { echo "Missing $EX/$bin - build the driver first." >&2; exit 2; }
+  [[ -x $EX/$bin ]] || { echo "Missing $EX/$bin - build the driver first, in a libfprint clone (branch crfpmoc): meson setup _build -Ddrivers=all -Dintrospection=false -Ddoc=false && meson compile -C _build" >&2; exit 2; }
 done
 if systemctl is-active --quiet fprintd; then
   echo "fprintd is running and may hold the reader. Stop it first: sudo systemctl stop fprintd" >&2

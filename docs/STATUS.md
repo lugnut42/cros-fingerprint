@@ -5,19 +5,20 @@ Last updated 2026-11-20.
 ## What works
 
 The reader works for day-to-day use on the tested machine (HP Elite Dragonfly
-Chromebook, Redrix) through the patched `crfpmoc` libfprint driver and stock
+Chromebook, Redrix) through the `crfpmoc` libfprint driver and stock
 fprintd. Verified live: enroll, match and wrong-finger rejection (both from the
 libfprint build tree and through fprintd), then sudo, polkit prompts and the
 Omarchy lock screen. Fingerprint sudo after a reboot is confirmed in the journal.
 
 ## What is installed
 
-- `libfprint-crfpmoc-local` (built from `packaging/` with the `patches/`
-  applied) and the official `fprintd`.
+- `libfprint-crfpmoc-local` (built from `packaging/`, which pins a commit of the
+  `crfpmoc` branch of the libfprint fork) and the official `fprintd`.
 - `/etc/pam.d/sudo` (backup `/etc/pam.d/sudo.before-fingerprint`),
   `/etc/pam.d/polkit-1`, `/etc/pam.d/omarchy-lock-fingerprint`, and the fprintd
   resume hook and stop-timeout drop-in written by `omarchy-apply-lock`.
-- Enrolled prints under `/var/lib/fprint`.
+- Enrolled prints under `/var/lib/fprint`, and the machine key at
+  `/var/lib/fprint/.crfpmoc/key` (root-only, mode 600, 76 bytes).
 - SDDM login is unchanged (password only).
 
 Undo with `scripts/install.sh --undo`; remove everything with
@@ -27,8 +28,14 @@ Undo with `scripts/install.sh --undo`; remove everything with
 
 - The goal is a working reader for sudo and the lock screen; the shortest path
   was preferred over finishing the standalone stack.
-- The driver's fixed, publicly known seed/context is used for now. A
-  machine-unique seed is a possible follow-up and would cost only a re-enroll.
+- The driver uses a random per-machine key (seed and user context), generated
+  once from the kernel RNG and stored root-only. An invalid or loosely
+  permissioned key file is an error and is never replaced; the key is created
+  only while the reader holds no seed, so after switching builds the driver asks
+  for a reboot; an undecryptable print reports "re-enroll". Prints and key file
+  belong together. Limits: root can read the key (no TPM sealing), one key per
+  machine not per user.
+- The driver source of truth is the libfprint `crfpmoc` branch, not patch files.
 - The standalone seed store, registry and admin tools
   (`experimental/standalone/`) are not used.
 
@@ -41,13 +48,14 @@ Undo with `scripts/install.sh --undo`; remove everything with
 
 ## Open items
 
-- Machine-unique seed.
-- The libfprint checkout's replay fixture no longer matches the open/enroll
+- The libfprint driver's replay fixture no longer matches the open/enroll
   sequence.
 - Identify with more than five prints fails (the reader holds five templates).
 - A poor touch during verify reports no-match rather than asking for a retry.
 - No security review of the driver.
-- The packaging recipe is to be rewritten.
+- Our fixes are not yet submitted upstream (`crfpmoc-upstream-fixes` branch).
+- Pending: check that prints still match after a further reboot under the machine key (verified 2026-11-20: stale-seed refusal, then enroll, match and wrong-finger rejection after one reboot).
+- The scripts' `--uninstall` and `--undo` paths have not been exercised on a real system.
 
 History of the earlier standalone work:
 [experimental/standalone/docs/HANDOFF.md](../experimental/standalone/docs/HANDOFF.md).

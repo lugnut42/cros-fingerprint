@@ -5,7 +5,7 @@ standalone C11 implementation of the FPMCU protocol, a read-only hardware
 diagnostic, and a design for a per-machine seed store, account registry and
 admin tools. It was never finished.
 
-**The working setup does not use any of this.** It uses a patched `crfpmoc`
+**The working setup does not use any of this.** It uses the `crfpmoc`
 libfprint driver with stock fprintd; see the top-level README. The design
 documents in `docs/` describe the abandoned approach and are kept as history
 (`docs/HANDOFF.md` is the old session log).
