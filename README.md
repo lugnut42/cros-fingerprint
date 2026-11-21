@@ -1,101 +1,96 @@
 # cros-fingerprint
 
-Linux fingerprint support for ChromeOS fingerprint controllers, starting with
-the HP Elite Dragonfly Chromebook (board name **Redrix**).
+Fingerprint login for the ChromeOS fingerprint reader (FPMCU) on an HP Elite
+Dragonfly Chromebook ("Redrix") running Omarchy or another Arch-based Linux.
 
-**Status: working on the target machine as of 2026-11-20.** The patched
-`crfpmoc` libfprint driver (see `patches/` and `packaging/`) with stock fprintd
-enrolls and matches, and fingerprint is enabled for sudo, polkit and the Omarchy
-lock screen. It uses the driver's fixed seed/context; this has not had a
-security review. See [docs/HANDOFF.md](docs/HANDOFF.md) for exactly what is
-installed, how to undo it, and what is still unverified. The standalone C
-diagnostic, seed store, registry and admin tools below are earlier groundwork
-and are not part of the working setup.
+It works by packaging a patched `crfpmoc` driver for libfprint, using stock
+`fprintd`, and adding PAM lines so a fingerprint can approve `sudo`, polkit
+prompts and (on Omarchy) the lock screen. Password fallback is kept everywhere.
+This repo holds the driver patches, the packaging recipe, the install scripts
+and the driver tests.
 
-The target machine already exposes `/dev/cros_fp` through existing Linux kernel
-drivers. Read-only queries have returned firmware information, command-version
-support, and sensor metadata. The initial work is therefore in userspace, with
-no demonstrated need for a new kernel driver or firmware changes.
+## Supported hardware
 
-## Start here
+Tested on exactly one machine: HP Elite Dragonfly Chromebook (Redrix), FPMCU
+board `bloonchipper`, firmware offering FP_INFO v2/v3. Facts are in
+[docs/HARDWARE.md](docs/HARDWARE.md). Other Chromebooks are untested; they may
+work if they use the same kind of reader, or may not.
 
-- [Current reboot handoff](docs/HANDOFF.md)
+## Prerequisites
 
-- [Development plan and TDD milestones](docs/PLAN.md)
-- [Implementation and licensing decisions](docs/DECISIONS.md)
-- [Current reuse and security review](docs/REUSE-REVIEW.md)
-- [Running tests and the red/green record](docs/TESTING.md)
-- [Hardware findings and their limits](docs/HARDWARE.md)
-- [Security and lifecycle design](docs/SECURITY-DESIGN.md)
-- [Seed/context hardware experiment](docs/SEED-CONTEXT-EXPERIMENT.md)
-- [State-directory and session APIs](docs/STATE-LIFECYCLE.md)
-- [Persistent account registry](docs/ACCOUNT-REGISTRY.md)
-- [Provisioned store and operation ownership](docs/PROVISIONED-STORE.md)
-- [Explicit storage administration](docs/ADMIN.md)
-- [Proposed first live prototype setup](docs/PROTOTYPE-LIVE-PLAN.md)
-- [Security acceptance scenarios](docs/SECURITY-TESTS.md)
-- [Security source review](docs/SECURITY-SOURCES.md)
-- [Linux event subscription and drain boundary](docs/EVENTS.md)
-- [Sources and existing implementations](docs/SOURCES.md)
-- [Contributor and agent instructions](AGENTS.md)
+- Linux already running on the Chromebook, with `/dev/cros_fp` present.
+- An Arch-based distribution with `pacman`, `sudo`, and `base-devel` (for
+  `makepkg`). Omarchy is the primary target; plain Arch works but skips the
+  lock-screen step.
+- Your normal (non-root) user. The scripts call `sudo` themselves.
 
-## Approach
-
-Build a small protocol layer behind a replaceable transport, test it without
-hardware, and establish a reliable read-only diagnostic before attempting
-enrollment. Then prove enrollment, verification, deletion, and secure restoration
-after reboot before integrating with libfprint/fprintd and the desktop.
-
-The implementation language is C11, with libfprint as the future integration
-target. The initial protocol core has no library dependencies. A separate
-privileged service remains a possibility if secure secret management cannot
-be accommodated appropriately in the existing stack; that decision is deferred
-until the security-design milestone.
-
-Tests must not require a fingerprint reader, root privileges, network access,
-or real biometric data. Hardware experiments are separate, explicit steps.
-
-## Local setup
-
-Clone into a normal development directory and use a C11 compiler, Make, Python 3 (CLI tests), and OpenSSL development
-headers/libcrypto (seed-store tests and experiment command):
+## Quick start
 
 ```sh
-make test
+git clone <this repo> && cd cros-fingerprint
+scripts/install.sh
 ```
 
-No system package replacement, PAM configuration, firmware modification, or
-reader access is needed. See [testing](docs/TESTING.md) for sanitizer commands.
+The script walks through four stages, pausing before each: locate or build the
+package, install it plus `fprintd`, enroll one finger and check a match and a
+non-match, then enable fingerprint for sudo, polkit and the lock screen. The
+sudo step makes you test in a second terminal first and rolls back if you say
+it failed. Options: `--package FILE` to use a prebuilt package, `--undo`,
+`--uninstall` (see `scripts/install.sh --help`).
 
-## Read-only hardware diagnostic
+## What it changes, and how to undo
 
-Build with `make`, then run `./build/cros-fingerprint-diagnostic`. On the target,
-`/dev/cros_fp` is accessible only to root; an explicit privileged invocation is:
+- Installs `libfprint-crfpmoc-local` (replacing stock `libfprint`) and `fprintd`.
+- Stores your enrolled print(s) under `/var/lib/fprint`.
+- Edits `/etc/pam.d/sudo` (backup at `/etc/pam.d/sudo.before-fingerprint`) and
+  creates `/etc/pam.d/polkit-1`.
+- On Omarchy, runs `omarchy-apply-lock`, which writes
+  `/etc/pam.d/omarchy-lock-fingerprint`, an fprintd resume hook and a
+  stop-timeout drop-in. The PAM lines match Omarchy's own, so its migrations
+  and removal script recognise them.
+- Does not touch SDDM/login, firmware or `/usr/share/omarchy`.
 
-```sh
-pkexec "$PWD/build/cros-fingerprint-diagnostic"
-```
+Undo: `scripts/install.sh --undo` puts sudo, polkit and the lock screen back to
+password only. `scripts/install.sh --uninstall` also removes both packages and,
+if you answer yes, your enrolled prints.
 
-The tool queries capabilities, sensor metadata, and encryption status only.
-It emits one schema-versioned JSON object on success, and errors on stderr with
-no JSON on failure. `--device PATH` selects another character device; symlinks
-are rejected. It performs no installation or authentication configuration.
+## Known limitations and security
 
-The five-second deadline starts after the program launches (not while waiting
-for pkexec authentication). On timeout the parent kills its worker and exits
-124; an uninterruptible kernel operation can outlive the kill request. The
-supervisor is for a one-shot CLI, not an embeddable long-running service.
-Worker failures exit 125; query/access failures exit 1; usage errors exit 2.
+- The driver uses a **fixed, publicly known seed/context**. Templates are still
+  encrypted by the reader, but anyone who knows the constant can derive the same
+  key setup; a machine-unique seed is future work.
+- The driver has had **no security review**. A fingerprint can approve `sudo`,
+  so treat this as convenience, not strong authentication.
+- SDDM/login stays password-only.
+- Reader firmware is not updated under Linux.
+- The reader holds five templates; identifying across more than five fails, and
+  a poor touch during verify reports no-match rather than a retry.
 
-## Licensing
+## Do not
 
-New project code is licensed under **LGPL-2.1-or-later**; see [LICENSE](LICENSE).
-No third-party driver implementation has been imported. Preserve licenses and
-attribution if incorporating external code in the future.
+- Do not run Omarchy's fingerprint setup menu (`omarchy-setup-security-fingerprint`)
+  or accept `libfprint-git`: it replaces the patched library.
+- Do not run the experimental seed tools in `experimental/standalone/`
+  (`--restore`, `--prepare`): they program a different seed, and prints enrolled
+  while it is set stop working after a reboot.
 
-## Read-only configured mode
+## Upstream
 
-`./build/cros-fingerprint-diagnostic --mode-status` negotiates FP_MODE v0 and
-sends only the exact DONT_CHANGE request. Its small JSON report indicates the
-configured mode; `configured_idle` is not a sensor-completion or event-freshness
-proof. The default metadata diagnostic output remains unchanged.
+The `crfpmoc` driver is an open upstream merge request (libfprint !512); the
+fixes in `patches/` are not yet upstream.
+
+## Layout
+
+| Path | Contents |
+| --- | --- |
+| `scripts/` | `install.sh` (entry point), plus the steps it runs: `install-and-enroll.sh`, `enable-fingerprint-auth.sh`; `smoke-test.sh` for the build tree |
+| `patches/` | libfprint patches for the driver |
+| `packaging/` | PKGBUILD for `libfprint-crfpmoc-local` |
+| `tests/` | offline driver tests, see [docs/TESTING.md](docs/TESTING.md) |
+| `docs/` | [STATUS.md](docs/STATUS.md), [HARDWARE.md](docs/HARDWARE.md), [TESTING.md](docs/TESTING.md) |
+| `experimental/standalone/` | earlier standalone C groundwork, unused; holds the read-only diagnostic |
+| `AGENTS.md` | rules for contributors and coding agents |
+
+## License
+
+LGPL-2.1-or-later; see [LICENSE](LICENSE).

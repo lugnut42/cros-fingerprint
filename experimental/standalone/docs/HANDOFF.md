@@ -59,7 +59,7 @@ Resumed on 2026-09-28 at the user’s request. See the resume checkpoint below;
 the pause instructions and stopping-point observations describe the prior session.
 
 User explicitly requested a pause to reboot. Stop development/hardware work
-until the user returns and asks to resume. Repository: /home/t/Work/cros-fingerprint.
+until the user returns and asks to resume. Repository: (this checkout).
 Read AGENTS.md, README.md, PLAN.md, and this file first.
 
 ## Stopping point
@@ -116,7 +116,7 @@ created; the new preparation CLI cannot yet perform a successful live run.
 ## Resume after reboot
 
 1. Run the existing read-only diagnostic outside the sandbox with root access:
-   `pkexec /home/t/Work/cros-fingerprint/build/cros-fingerprint-diagnostic`.
+   `pkexec experimental/standalone/build/cros-fingerprint-diagnostic`.
    Check reader usage (`systemctl is-active fprintd`, privileged holder check
    if needed). Sandbox visibility is not evidence of a missing device.
 2. Record actual seed/template/fault status. Do not automatically restore merely

@@ -30,7 +30,7 @@ not proof that the whole event path is quiescent.
 
 ## Execution after approval
 
-All binaries are from `/home/t/Work/cros-fingerprint/build`. Check fprintd status
+All binaries are from `experimental/standalone/build`. Check fprintd status
 and cooperating device holders before state-changing reader work. Confirm the
 actual selected UID/name against the OS. The current shell reports UID 1000 and
 name t; recheck rather than relying on this note indefinitely.

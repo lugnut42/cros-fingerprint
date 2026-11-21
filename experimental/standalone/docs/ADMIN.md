@@ -77,7 +77,7 @@ commands, reset, enrollment, PAM, packages, or services are part of this scope.
 
 1. Inspect `build/cros-fingerprint-admin --plan` from the reviewed build.
 2. With explicit authorization for this live scope, run
-   `pkexec /home/t/Work/cros-fingerprint/build/cros-fingerprint-admin --provision`.
+   `pkexec experimental/standalone/build/cros-fingerprint-admin --provision`.
 3. Run that executable with `--register UID NAME` for the authorized account,
    then `--check` and `--check-account UID NAME`. Substitute the actual UID/name;
    the command verifies the pair against the OS inside its deadline.

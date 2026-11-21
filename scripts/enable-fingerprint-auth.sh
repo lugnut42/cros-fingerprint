@@ -5,9 +5,14 @@
 #
 # The script stays root while you test, and restores the old sudo config if
 # you say the test failed. Undo later with: enable-fingerprint-auth.sh --undo
+#
+# On Arch without Omarchy (no omarchy-apply-lock or omarchy-hw-laptop-closed),
+# the lock-screen step is skipped and the lid-closed gate line is not written.
 set -u
 
 SELF=$(readlink -f "$0")
+# shellcheck source=lib.sh
+source "$(dirname "$SELF")/lib.sh"
 BACKUP=/etc/pam.d/sudo.before-fingerprint
 GATE='auth      [success=1 default=ignore] pam_exec.so quiet /usr/bin/omarchy-hw-laptop-closed'
 FPRINT='auth      sufficient pam_fprintd.so'
@@ -17,6 +22,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 export OMARCHY_PATH=${OMARCHY_PATH:-/usr/share/omarchy}
 USER_NAME=${SUDO_USER:?run via sudo from your own account}
+if fp_have_omarchy; then OMARCHY=1; else OMARCHY=0; fi
 
 undo() {
   echo "Restoring password-only authentication..."
@@ -40,10 +46,12 @@ fi
 
 [[ -x /usr/lib/security/pam_fprintd.so || -f /usr/lib/security/pam_fprintd.so ]] ||
   { echo "pam_fprintd.so is not installed." >&2; exit 2; }
-[[ -x /usr/bin/omarchy-hw-laptop-closed ]] ||
-  { echo "/usr/bin/omarchy-hw-laptop-closed is missing." >&2; exit 2; }
+if [[ $OMARCHY -eq 0 ]]; then
+  echo "Omarchy lock-screen tools not found; sudo and polkit will be configured,"
+  echo "the lock-screen step will be skipped and no lid-closed gate line is written."
+fi
 /usr/bin/fprintd-list "$USER_NAME" | grep -qE '^[[:space:]]*-[[:space:]]*#[0-9]+:' ||
-  { echo "No finger enrolled for $USER_NAME; run install-and-enroll.sh first." >&2; exit 2; }
+  { echo "No finger enrolled for $USER_NAME; run scripts/install.sh first." >&2; exit 2; }
 if [[ -e /etc/pam.d/polkit-1 ]]; then
   echo "/etc/pam.d/polkit-1 already exists; not overwriting it. Stopping." >&2
   exit 2
@@ -53,10 +61,10 @@ if grep -q pam_fprintd /etc/pam.d/sudo; then
   exit 2
 fi
 
-echo "== Step 1 of 3: sudo =="
+echo "== Enable: sudo =="
 cp -a /etc/pam.d/sudo "$BACKUP"
 { head -n1 "$BACKUP" | grep -q '^#%PAM' && head -n1 "$BACKUP"
-  echo "$GATE"
+  [[ $OMARCHY -eq 1 ]] && echo "$GATE"
   echo "$FPRINT"
   if head -n1 "$BACKUP" | grep -q '^#%PAM'; then tail -n +2 "$BACKUP"; else cat "$BACKUP"; fi
 } > /etc/pam.d/sudo.new
@@ -77,9 +85,10 @@ if [[ ${answer,,} != y* ]]; then
 fi
 
 echo
-echo "== Step 2 of 3: polkit prompts =="
-cat > /etc/pam.d/polkit-1 <<EOF
-$GATE
+echo "== Enable: polkit prompts =="
+{
+  [[ $OMARCHY -eq 1 ]] && echo "$GATE"
+  cat <<EOF
 $FPRINT
 auth      include system-auth
 
@@ -87,16 +96,21 @@ account   include system-auth
 password  include system-auth
 session   include system-auth
 EOF
+} > /etc/pam.d/polkit-1
 chmod 644 /etc/pam.d/polkit-1
 echo "Created /etc/pam.d/polkit-1"
 
 echo
-echo "== Step 3 of 3: lock screen =="
-/usr/share/omarchy/bin/omarchy-apply-lock ||
-  echo "omarchy-apply-lock reported an error; the lock screen may still be password only." >&2
+echo "== Enable: lock screen =="
+if [[ $OMARCHY -eq 1 ]]; then
+  /usr/share/omarchy/bin/omarchy-apply-lock ||
+    echo "omarchy-apply-lock reported an error; the lock screen may still be password only." >&2
+else
+  echo "Skipped: Omarchy's lock-screen tooling is not installed."
+fi
 
 echo
 echo "Finished. Try it:"
-echo "  - Lock the screen (Super+Ctrl+L) and unlock with your finger; then again with your password."
+[[ $OMARCHY -eq 1 ]] && echo "  - Lock the screen (Super+Ctrl+L) and unlock with your finger; then again with your password."
 echo "  - Trigger a polkit prompt, e.g.:  pkexec true"
 echo "To undo everything:  $SELF --undo"

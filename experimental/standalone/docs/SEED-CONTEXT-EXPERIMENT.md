@@ -9,7 +9,7 @@ It does not complete the account-registry or already-set-seed recovery design.
 After explicit authorization, run from the reviewed checkout:
 
 ```sh
-pkexec /home/t/Work/cros-fingerprint/build/cros-fingerprint-seed-context-test --initialize
+pkexec experimental/standalone/build/cros-fingerprint-seed-context-test --initialize
 ```
 
 `--plan` displays the scope without root, device access, or filesystem writes.
@@ -135,7 +135,7 @@ This normal host reboot cleared the controller seed in this observed run;
 it does not establish the behavior of every restart or power transition.
 
 `make test` passed all offline suites. Reviewed the existing restore path and
-ran `pkexec /home/t/Work/cros-fingerprint/build/cros-fingerprint-seed-context-test --restore`.
+ran `pkexec experimental/standalone/build/cros-fingerprint-seed-context-test --restore`.
 It exited 0, loading the existing private records without initialization or
 regeneration. FP_SEED was accepted and FP_CONTEXT v1 completed successfully.
 A separate fresh-process read-only diagnostic exited 0 and confirmed

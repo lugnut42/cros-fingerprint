@@ -4,7 +4,9 @@
 # Nothing is installed; logs and the encrypted print go to ~/fp-smoke.
 set -u
 
-EX=/home/t/Work/cros-fingerprint/build-libfprint-reference/examples
+# shellcheck source=lib.sh
+source "$(dirname "$(readlink -f "$0")")/lib.sh"
+EX=${FP_EXAMPLES_DIR:-$REPO_ROOT/build-libfprint-reference/examples}
 OUT="$HOME/fp-smoke"
 
 if [[ $EUID -eq 0 ]]; then
@@ -26,8 +28,6 @@ run() { # run <example> <logfile>
   sudo env G_MESSAGES_DEBUG=all FP_DRIVERS_ALLOWLIST=crfpmoc "$EX/$1" 2>&1 | tee "$2"
   return "${PIPESTATUS[0]}"
 }
-
-pause() { read -r -p $'\n'"$1 Press Enter to continue (Ctrl-C to stop)... " _; }
 
 echo "== Step 1 of 3: enroll =="
 echo "Pick a finger when asked, then touch the sensor repeatedly until it"

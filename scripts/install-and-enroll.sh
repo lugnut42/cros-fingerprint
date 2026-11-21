@@ -2,23 +2,38 @@
 # Install the patched libfprint package plus stock fprintd, enroll one finger
 # through fprintd, and check a match and a non-match.
 # Does NOT touch PAM, sudo, or the lock screen.
+#
+# usage: install-and-enroll.sh [--package FILE.pkg.tar.zst]
+# Without --package, the newest packaging/libfprint-crfpmoc-local-*.pkg.tar.zst
+# is used. (scripts/install.sh can also build it for you.)
 set -u
 
-PKG=/home/t/Work/cros-fingerprint/packaging/libfprint-crfpmoc-local-1.94.10-1-x86_64.pkg.tar.zst
+# shellcheck source=lib.sh
+source "$(dirname "$(readlink -f "$0")")/lib.sh"
+
+PKG=
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --package) PKG=${2:?--package needs a file}; shift 2 ;;
+    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+[[ -n $PKG ]] || PKG=$(fp_newest_package)
 LOG="$HOME/fp-smoke/install.log"
 
 if [[ $EUID -eq 0 ]]; then
   echo "Run this as your normal user; it calls sudo itself." >&2
   exit 2
 fi
-[[ -f $PKG ]] || { echo "Missing package: $PKG" >&2; exit 2; }
+[[ -n $PKG && -f $PKG ]] || { echo "Missing package: ${PKG:-(none found in $PACKAGING_DIR)}" >&2; exit 2; }
+PKG=$(readlink -f "$PKG")
 mkdir -p "$(dirname "$LOG")"
 exec > >(tee "$LOG") 2>&1
 sudo -v || exit 2
 
-pause() { read -r -p $'\n'"$1 Press Enter to continue (Ctrl-C to stop)... " _; }
-
-echo "== Step 1 of 4: install packages =="
+echo "-- Install packages --"
+echo "Package: $PKG"
 sudo pacman -U --needed --noconfirm "$PKG" || { echo "libfprint package install failed" >&2; exit 1; }
 sudo pacman -S --needed --noconfirm fprintd || { echo "fprintd install failed" >&2; exit 1; }
 sudo systemctl restart fprintd
@@ -28,23 +43,28 @@ echo "Devices fprintd sees:"
 sudo fprintd-list "$USER" || { echo "fprintd cannot see the reader; see: journalctl -u fprintd -b" >&2; exit 1; }
 
 echo
-echo "== Step 2 of 4: enroll your RIGHT INDEX finger =="
+echo "-- Enroll your RIGHT INDEX finger --"
 echo "Touch and lift repeatedly until it says enroll-completed."
 pause "Ready?"
 sudo fprintd-enroll -f right-index-finger "$USER" || { echo "enroll failed; see: journalctl -u fprintd -b" >&2; exit 1; }
 
 echo
-echo "== Step 3 of 4: verify with your RIGHT INDEX finger (expect verify-match) =="
+echo "-- Verify with your RIGHT INDEX finger (expect verify-match) --"
 pause "Ready?"
 sudo fprintd-verify -f right-index-finger "$USER"
-echo "exit code: $?"
+rc=$?
+echo "exit code: $rc"
+if [[ $rc -ne 0 ]]; then
+  read -r -p "The matching check did not report success. Continue anyway? [y/N] " answer
+  [[ ${answer,,} == y* ]] || { echo "Stopping. See: journalctl -u fprintd -b" >&2; exit 1; }
+fi
 
 echo
-echo "== Step 4 of 4: verify with a DIFFERENT finger, e.g. left index (expect verify-no-match) =="
+echo "-- Verify with a DIFFERENT finger, e.g. left index (expect verify-no-match) --"
 echo "Do not pick anything; just touch the sensor with the wrong finger."
 pause "Ready?"
 sudo fprintd-verify -f right-index-finger "$USER"
-echo "exit code: $?"
+echo "exit code: $?  (non-zero / verify-no-match is the expected result here)"
 
 echo
 echo "Done. Log saved to $LOG"
