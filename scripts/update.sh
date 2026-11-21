@@ -4,9 +4,8 @@
 #
 # usage: update.sh [--package FILE.pkg.tar.zst]
 # Without --package, the newest packaging/libfprint-crfpmoc-local-*.pkg.tar.zst
-# is used. If the check fails, reinstall the previous package file with
-# `sudo pacman -U <old file>`; pacman also keeps it in /var/cache/pacman/pkg
-# only for repo packages, so keep the old file until the new one is proven.
+# is used. Keep the previous package file until the new one is proven: if the
+# check fails, go back with `sudo pacman -U <previous file>`.
 set -u
 
 # shellcheck source=lib.sh
@@ -16,7 +15,7 @@ PKG=
 while [[ $# -gt 0 ]]; do
   case $1 in
     --package) PKG=${2:?--package needs a file}; shift 2 ;;
-    -h|--help) sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
