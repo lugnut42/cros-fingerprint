@@ -1,0 +1,23 @@
+# Build outputs
+/build/
+/build-*/
+/target/
+__pycache__/
+*.pyc
+.venv/
+
+# Local hardware experiments. Never store actual biometric material in the repo.
+/local-private/
+*.fp-template
+*.fp-seed
+*.pgm
+*.raw
+
+# Downloaded reference material; never compiled or distributed with the project.
+/.reference-cache/
+
+# local package build outputs
+packaging/src/
+packaging/pkg/
+packaging/*.pkg.tar.zst
+packaging/build.log

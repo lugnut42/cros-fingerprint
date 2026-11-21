@@ -1,0 +1,50 @@
+# Local build of the patched libfprint fork (crfpmoc driver for the ChromeOS
+# FPMCU at /dev/cros_fp). Modeled on Arch's official libfprint 1.94.100-2
+# PKGBUILD. NOT based on the AUR; builds only from the local checkout below.
+pkgname=libfprint-crfpmoc-local
+_basename=libfprint
+pkgver=1.94.10
+pkgrel=1
+pkgdesc="Library for fingerprint readers (local fork with crfpmoc / ChromeOS FPMCU driver)"
+url="https://fprint.freedesktop.org/"
+arch=(x86_64)
+license=(LGPL-2.1-or-later)
+depends=(libgcc glib2 glibc libgudev libgusb openssl pixman)
+makedepends=(glib2-devel meson systemd)        # official also has git, gobject-introspection, gtk-doc, python-*
+# checkdepends=(cairo umockdev)                # tests are skipped (umockdev not installed)
+# provides: libfprint=<ver> satisfies "libfprint" deps; libfprint-2.so=2-64 satisfies fprintd's soname dep
+# (verify with: pacman -Si fprintd | grep Depends -> libfprint-2.so=2-64)
+provides=("libfprint=1.94.100" libfprint-git "libfprint-2.so=2-64")
+conflicts=(libfprint libfprint-git)
+groups=(fprint)
+# No network sources. Point _srcdir at the exact checkout; prepare() copies it.
+source=()
+options=(!debug)
+
+_srcdir=${LIBFPRINT_SRC:-/home/t/Work/cros-fingerprint/.reference-cache/libfprint-checkout/acd407-libfprint-4df0591}
+
+prepare() {
+  rm -rf "$srcdir/$_basename"
+  mkdir -p "$srcdir/$_basename"
+  # copy, never build in place; drop VCS data and any stray build dirs
+  tar -C "$_srcdir" --exclude=.git --exclude='build*' -cf - . | tar -C "$srcdir/$_basename" -xf -
+  # sanity: refuse to package a tree without the driver
+  test -f "$srcdir/$_basename/libfprint/drivers/crfpmoc/crfpmoc.c"
+}
+
+build() {
+  # Same driver set as Arch (all = every real driver + virtual_* used by fprintd tests),
+  # which includes crfpmoc in this fork. udev_rules/udev_hwdb left on 'auto' like Arch.
+  arch-meson $_basename build \
+    -D drivers=all \
+    -D installed-tests=false \
+    -D introspection=false \
+    -D doc=false
+  meson compile -C build
+}
+
+# check() { meson test -C build --print-errorlogs; }   # needs umockdev
+
+package() {
+  meson install -C build --destdir "$pkgdir"
+}
