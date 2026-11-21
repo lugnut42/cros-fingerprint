@@ -8,7 +8,7 @@ The reader works for day-to-day use on the tested machine (HP Elite Dragonfly
 Chromebook, Redrix) through the `crfpmoc` libfprint driver and stock
 fprintd. Verified live: enroll, match and wrong-finger rejection (both from the
 libfprint build tree and through fprintd), then sudo, polkit prompts and the
-Omarchy lock screen. Fingerprint sudo after a reboot is confirmed in the journal.
+Omarchy lock screen. Under the per-machine key, the stale-seed refusal, enroll, match and wrong-finger rejection were verified, and a fingerprint sudo after a further reboot is confirmed in the journal (2026-11-20).
 
 ## What is installed
 
@@ -54,7 +54,6 @@ Undo with `scripts/install.sh --undo`; remove everything with
 - A poor touch during verify reports no-match rather than asking for a retry.
 - No security review of the driver.
 - Our fixes are not yet submitted upstream (`crfpmoc-upstream-fixes` branch).
-- Pending: check that prints still match after a further reboot under the machine key (verified 2026-11-20: stale-seed refusal, then enroll, match and wrong-finger rejection after one reboot).
 - The scripts' `--uninstall` and `--undo` paths have not been exercised on a real system.
 
 History of the earlier standalone work:
