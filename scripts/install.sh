@@ -94,12 +94,6 @@ else
     echo "Using existing build: $PKG"
   else
     echo "No built package found in $PACKAGING_DIR; building it with makepkg."
-    # The recipe reads LIBFPRINT_SRC as the patched source checkout.
-    if [[ -z ${LIBFPRINT_SRC:-} ]]; then
-      export LIBFPRINT_SRC=$REPO_ROOT/.reference-cache/libfprint-checkout/acd407-libfprint-4df0591
-    fi
-    [[ -d $LIBFPRINT_SRC ]] ||
-      { echo "Source checkout not found: $LIBFPRINT_SRC (set LIBFPRINT_SRC or use --package)." >&2; exit 2; }
     pause "makepkg may ask for your sudo password to install build dependencies."
     (cd "$PACKAGING_DIR" && makepkg -f -s) || { echo "makepkg failed." >&2; exit 1; }
     PKG=$(fp_newest_package)
