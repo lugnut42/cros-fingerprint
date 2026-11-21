@@ -8,7 +8,7 @@
 # To build from a local clone instead of GitHub (e.g. offline):
 #   LIBFPRINT_REPO=file:///path/to/libfprint makepkg -f
 pkgname=libfprint-crfpmoc-local
-pkgver=1.94.100.r56.g34729dde
+pkgver=1.94.100.r59.g52fdaa20
 pkgrel=1
 pkgdesc="Library for fingerprint readers, with the crfpmoc ChromeOS fingerprint MCU driver"
 url="https://fprint.freedesktop.org/"
@@ -24,7 +24,7 @@ groups=(fprint)
 options=(!debug)
 
 _repo=${LIBFPRINT_REPO:-https://github.com/lugnut42/libfprint.git}
-_commit=34729dde4c0abe3d3d333084cade7eeaebc92e80
+_commit=52fdaa2072497845386a45104ac27880071bb0b3
 source=("libfprint::git+$_repo#commit=$_commit")
 sha256sums=(SKIP)
 

@@ -67,4 +67,13 @@ sudo fprintd-verify -f right-index-finger "$USER"
 echo "exit code: $?  (non-zero / verify-no-match is the expected result here)"
 
 echo
+echo "-- Machine key --"
+if sudo test -e /var/lib/fprint/.crfpmoc/key; then
+  echo "key file: $(sudo stat -c 'mode %a, owner %U, %s bytes' /var/lib/fprint/.crfpmoc/key)  (expect mode 600, owner root, 76 bytes)"
+  echo "Back this file up together with /var/lib/fprint if you back up prints; without it they cannot be used."
+else
+  echo "No machine key file found. This build may predate the machine-key change." >&2
+fi
+
+echo
 echo "Done. Log saved to $LOG"
